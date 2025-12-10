@@ -56,9 +56,8 @@ O projeto foi desenvolvido em **Python 3**. As bibliotecas necessárias são:
 1.  **Clone ou baixe o repositório.**
 2.  **Instale as dependências:**
     ```bash
-    pip install pygame pygad scikit-fuzzy numpy opencv-python
+    pip install pygame pygad scikit-fuzzy numpy opencv-python scipy
     ```
-
 -----
 
 ## ⚙️ Configuração da Simulação

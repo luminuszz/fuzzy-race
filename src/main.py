@@ -6,7 +6,7 @@ import pygad
 import cv2
 import csv
 import datetime
-import os  # <--- NECESSÁRIO PARA CRIAR PASTAS
+import os
 
 # ==========================================
 # CONFIGURAÇÕES GERAIS
@@ -14,26 +14,27 @@ import os  # <--- NECESSÁRIO PARA CRIAR PASTAS
 CONFIG = {
     'WIDTH': 1000,
     'HEIGHT': 700,
-    'FPS': 0,
-    'CAR_SCALE': 1.5,
-    'SENSOR_RANGE': 100,
-    'MAX_FRAMES': 2000,
+    'FPS': 0,  # 0 para velocidade máxima
+    'CAR_SCALE': 1.5,  # Escala visual do carro
+    'SENSOR_RANGE': 100,  # Alcance dos sensores
+    'MAX_FRAMES': 2000,  # Tempo limite por geração
     'TRACK_WIDTH': 100,
 
-    # Parâmetros GA
-    'POPULATION_SIZE': 90,
-    'PARENTS_MATING': 20,
-    'ELITISM_COUNT': 5,
-    'TOURNAMENT_K': 3,
+
+    'POPULATION_SIZE': 20,
+    'PARENTS_MATING': 6,
+    'ELITISM_COUNT': 2,
+    'TOURNAMENT_K': 2,
+    # --------------------------------------
 
     'CONVERGENCE_TARGET': 0.95,
 
-    # Parâmetros do Recozimento Simulado
+    # Parâmetros de Mutação (Recozimento Simulado)
     'INITIAL_MUTATION': 25.0,
     'MIN_MUTATION': 1.0,
     'COOLING_RATE': 0.995,
 
-    'RECORD_VIDEO': True,
+    'RECORD_VIDEO': False,
     'VIDEO_FILENAME': 'video.mp4',
     'REPORT_FILE': 'relatorio.txt',
     'CSV_FILE': 'dados.csv'
@@ -47,14 +48,15 @@ COLORS = {
 }
 
 TRACK_POINTS = [
-    (100, 150), (400, 100), (800, 100), (900, 200),
-    (900, 450), (800, 550), (600, 600), (400, 600),
-    (250, 550), (200, 450), (300, 350), (200, 250), (100, 200)
+    (150, 150), (500, 80), (850, 150),
+    (920, 350), (850, 550), (500, 620),
+    (150, 550), (200, 350)
 ]
 
 FUZZY_UNIVERSE = np.arange(0, 101, 1)
 STEERING_OPTIONS = [-45, -25, 0, 25, 45]
 
+# Definição das funções de pertinência Fuzzy
 fuzz_vc = fuzz.trimf(FUZZY_UNIVERSE, [0, 0, 25])
 fuzz_c = fuzz.trimf(FUZZY_UNIVERSE, [0, 25, 50])
 fuzz_m = fuzz.trimf(FUZZY_UNIVERSE, [25, 50, 75])
@@ -83,6 +85,7 @@ class RaceCar:
 
         self.image = pygame.Surface((w, h), pygame.SRCALPHA)
 
+        # Desenho do carro
         body_points = [(0, h * 0.2), (w * 0.6, 0), (w, h * 0.3), (w, h * 0.7), (w * 0.6, h), (0, h * 0.8)]
         pygame.draw.polygon(self.image, COLORS['RED'], body_points)
         nose_points = [(w * 0.7, h * 0.15), (w, h * 0.3), (w, h * 0.7), (w * 0.7, h * 0.85)]
@@ -96,7 +99,7 @@ class RaceCar:
 
         self.original_image = self.image
         self.position = pygame.math.Vector2(TRACK_POINTS[0])
-        self.angle = -20
+        self.angle = -10
         self.speed = 6
         self.is_alive = True
         self.has_crashed = False
@@ -108,6 +111,11 @@ class RaceCar:
         self.center_map = pygame.math.Vector2(CONFIG['WIDTH'] // 2, CONFIG['HEIGHT'] // 2)
         self.total_radians = 0.0
         self.last_angle_rad = self._get_angle_to_center()
+
+        # === CONTROLE ANTI-SPIN (ANTI-ZERINHO) ===
+        self.spin_accumulator = 0  # Acumula graus virados
+        self.distance_at_last_spin = 0  # Distância quando começou a contar o giro
+        # =========================================
 
     def _get_angle_to_center(self):
         dx = self.position.x - self.center_map.x
@@ -156,7 +164,6 @@ class RaceCar:
         current_rad = self._get_angle_to_center()
         diff = current_rad - self.last_angle_rad
 
-        # Ajuste matemático para a virada de quadrante
         if diff < -math.pi:
             diff += 2 * math.pi
         elif diff > math.pi:
@@ -165,17 +172,13 @@ class RaceCar:
         self.total_radians += diff
         self.last_angle_rad = current_rad
 
-        # --- NOVA REGRA: MATAR SE ANDAR NA CONTRAMÃO ---
-        # Se o acumulado de voltas for negativo (ex: -0.2 rad),
-        # significa que ele está voltando. Eliminamos ele.
+        # Regra: Matar se andar na contramão (voltar atrás da largada)
         if self.total_radians < -0.2:
             self.is_alive = False
-            self.has_crashed = True  # Consideramos como batida para penalizar
-            self.distance_traveled = 0  # Zera a pontuação para ele não ser selecionado
+            self.has_crashed = True
+            self.total_radians = -5  # Penalidade forte
             return
-        # -----------------------------------------------
 
-        # Verifica vitória (2 voltas = ~12.5 radianos)
         if self.total_radians >= 12.50:
             self.has_finished = True
             self.is_alive = False
@@ -198,6 +201,8 @@ class RaceCar:
     def update(self, track_mask):
         if not self.is_alive: return
         self.time_alive += 1
+
+        # 1. Sensores
         angles = [-60, -30, 0, 30, 60]
         self.sensor_data = []
         self.sensor_readings = []
@@ -206,15 +211,39 @@ class RaceCar:
             self.sensor_data.append((dist, pt))
             self.sensor_readings.append(min(100, (dist / CONFIG['SENSOR_RANGE']) * 100))
 
+        # 2. Verifica Colisão
         if any(r < 5 for r in self.sensor_readings):
             self.is_alive = False
             self.has_crashed = True
             self.has_finished = False
             return
 
+        # 3. Atualiza Progresso e Verifica Contramão
         self.update_lap_progress()
         if self.has_finished: return
-        self.angle += self.decide_steering()
+
+        # 4. Calcula Steering e Move
+        steering = self.decide_steering()
+        self.angle += steering
+
+        # === VERIFICAÇÃO ANTI-SPIN (ELIMINA CARROS QUE FICAM GIRANDO) ===
+        self.spin_accumulator += steering
+
+        # Se acumulou giro de 360 graus (para qualquer lado)
+        if abs(self.spin_accumulator) >= 360:
+            distance_covered = self.distance_traveled - self.distance_at_last_spin
+
+            # Se girou 360 mas andou pouco (menos de 400px), é zerinho.
+            if distance_covered < 400:
+                self.is_alive = False
+                self.has_crashed = True
+                self.total_radians = -2  # Zera ou negativiza o fitness
+
+            # Reseta contadores
+            self.spin_accumulator = 0
+            self.distance_at_last_spin = self.distance_traveled
+        # ==============================================================
+
         rad = math.radians(360 - self.angle)
         self.position.x += math.cos(rad) * self.speed
         self.position.y += math.sin(rad) * self.speed
@@ -235,20 +264,27 @@ def create_track_surface():
 def calculate_fitness_scores(cars, max_time):
     scores = []
     any_finished = any(c.has_finished for c in cars)
-    for c in cars:
-        if c.has_finished:
-            score = 50000 + (max_time - c.time_alive)
+
+    for car in cars:
+        score = 0
+        if car.has_finished:
+            score = 100000 + (max_time - car.time_alive)
         else:
-            if any_finished and c.has_crashed:
+            if any_finished and car.has_crashed:
                 score = 0
             else:
-                score = c.distance_traveled if c.distance_traveled >= 200 else 0
+                # O fitness principal é o progresso angular (voltas na pista)
+                # Multiplicamos por 1000 para ser um número relevante
+                score = car.total_radians * 1000
+
+                # Se o carro for pego andando pra trás (total_radians negativo), score é 0
+                if score < 0: score = 0
+
         scores.append(score)
     return scores
 
 
 def save_final_report(stats_history, events_log, total_time_str, run_id):
-    # 1. Salva CSV
     try:
         with open(CONFIG['CSV_FILE'], mode='w', newline='', encoding='utf-8-sig') as file:
             writer = csv.writer(file)
@@ -258,20 +294,14 @@ def save_final_report(stats_history, events_log, total_time_str, run_id):
     except Exception as e:
         print(f"Erro ao salvar CSV: {e}")
 
-    # 2. Salva Relatório de Texto
     try:
         with open(CONFIG['REPORT_FILE'], 'w', encoding='utf-8') as f:
             f.write("=" * 60 + "\n")
-            f.write(f"RELATÓRIO TÉCNICO - EXPERIMENTO FUZZY GENÉTICO\n")
-            f.write(f"ID DO EXPERIMENTO: {run_id}\n")
-            f.write(f"DATA: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}\n")
+            f.write(f"RELATÓRIO TÉCNICO - {run_id}\n")
             f.write("=" * 60 + "\n\n")
 
-            f.write("1. PARÂMETROS E CONFIGURAÇÕES:\n")
+            f.write("1. PARÂMETROS:\n")
             f.write(f"- População: {CONFIG['POPULATION_SIZE']}\n")
-            f.write(f"- Seleção: Torneio (K={CONFIG['TOURNAMENT_K']})\n")
-            f.write(f"- Mutação Inicial: {CONFIG['INITIAL_MUTATION']}%\n")
-            f.write(f"- Taxa de Resfriamento: {CONFIG['COOLING_RATE']}\n")
             f.write(f"- Convergência Alvo: {CONFIG['CONVERGENCE_TARGET'] * 100}%\n\n")
 
             best_fits = [row[1] for row in stats_history]
@@ -282,14 +312,12 @@ def save_final_report(stats_history, events_log, total_time_str, run_id):
             f.write(f"- Duração: {total_time_str}\n")
             f.write(f"- Gerações: {len(stats_history)}\n")
             f.write(f"- Maior Fitness: {max(best_fits):.2f}\n")
-            f.write(f"- Média Final: {avg_fits[-1]:.2f}\n")
-            f.write(f"- Vencedores Máx: {max(winners)}/{CONFIG['POPULATION_SIZE']}\n\n")
+            f.write(f"- Vencedores Máx: {max(winners)}\n\n")
 
-            f.write("3. LOG DE EVENTOS:\n")
+            f.write("3. EVENTOS:\n")
             for event in events_log:
                 f.write(f"- {event}\n")
             f.write("\n" + "=" * 60)
-
         print(f"Relatório salvo em: {CONFIG['REPORT_FILE']}")
     except Exception as e:
         print(f"Erro ao salvar Relatório: {e}")
@@ -300,26 +328,20 @@ def pygad_fitness_func(ga_instance, solution, solution_idx):
 
 
 def main():
-    # --- SETUP INICIAL DE PASTAS E ARQUIVOS ---
-    # Cria a pasta 'relatorios' se não existir
     output_dir = "relatorios"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-        print(f"Pasta '{output_dir}' criada.")
 
-    # Gera um ID único baseado no tempo atual
     run_id = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     print(f"Iniciando Experimento: {run_id}")
 
-    # Atualiza os caminhos no CONFIG para usar a pasta e o ID
     CONFIG['VIDEO_FILENAME'] = os.path.join(output_dir, f"video_{run_id}.mp4")
     CONFIG['REPORT_FILE'] = os.path.join(output_dir, f"relatorio_{run_id}.txt")
     CONFIG['CSV_FILE'] = os.path.join(output_dir, f"dados_{run_id}.csv")
-    # -------------------------------------------
 
     pygame.init()
     screen = pygame.display.set_mode((CONFIG['WIDTH'], CONFIG['HEIGHT']))
-    pygame.display.set_caption(f"Fuzzy AI - Exp: {run_id}")
+    pygame.display.set_caption(f"Fuzzy AI (Pop: {CONFIG['POPULATION_SIZE']})")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Arial", 18)
     track_surface = create_track_surface()
@@ -375,7 +397,7 @@ def main():
                     if car.is_alive or car.has_finished: active_cars += 1
                     if car.has_finished: finished_cars += 1
 
-                info_text = f"Gen: {generation_id} | Vivos: {active_cars} | Vencedores: {finished_cars} | Mutação: {ga.mutation_percent_genes}%"
+                info_text = f"Gen: {generation_id} | Vivos: {active_cars}/{CONFIG['POPULATION_SIZE']} | Wins: {finished_cars} | mutação: {ga.mutation_percent_genes}%"
                 screen.blit(font.render(info_text, True, COLORS['BLUE']), (20, 20))
 
                 if CONFIG['RECORD_VIDEO'] and video_writer:
@@ -403,22 +425,17 @@ def main():
                 [generation_id, round(best_fitness, 2), round(avg_fitness, 2), finished_cars, current_mutation])
 
             if finished_cars > 0 and not first_win_recorded:
-                events_log.append(
-                    f"Geração {generation_id}: PRIMEIRO VENCEDOR IDENTIFICADO (Fitness: {best_fitness:.2f})")
+                events_log.append(f"Gen {generation_id}: PRIMEIRO VENCEDOR! (Fit: {best_fitness:.2f})")
                 first_win_recorded = True
 
-            if convergence_rate >= 0.5 and not any("50%" in e for e in events_log):
-                events_log.append(f"Geração {generation_id}: Convergência superou 50% da população.")
-
-            print(
-                f"Gen {generation_id} | Melhor: {best_fitness:.0f} | Média: {avg_fitness:.0f} | Vencedores: {finished_cars} | Mutação: {current_mutation}%")
+            print(f"Gen {generation_id} | Best: {best_fitness:.0f} | Wins: {finished_cars}")
 
             if convergence_rate >= CONFIG['CONVERGENCE_TARGET']:
-                events_log.append(
-                    f"Geração {generation_id}: CRITÉRIO DE PARADA ATINGIDO ({convergence_rate * 100:.1f}% de sucesso)")
-                print(">>> Convergência atingida. Finalizando experimento...")
+                events_log.append(f"Gen {generation_id}: CONVERGÊNCIA ATINGIDA!")
+                print(">>> Convergência atingida.")
                 running = False
 
+            # Mutação Adaptativa
             new_mutation_rate = CONFIG['INITIAL_MUTATION'] * (CONFIG['COOLING_RATE'] ** generation_id)
             if new_mutation_rate < CONFIG['MIN_MUTATION']: new_mutation_rate = CONFIG['MIN_MUTATION']
             if finished_cars > (CONFIG['POPULATION_SIZE'] * 0.5): new_mutation_rate = max(1.0, new_mutation_rate / 2)
@@ -435,10 +452,9 @@ def main():
             generation_id += 1
 
     finally:
-        print("\nGerando relatórios finais...")
+        print("\nFinalizando...")
         end_time = datetime.datetime.now()
         duration = end_time - start_time_real
-        # Passa o run_id para a função de salvamento
         save_final_report(stats_history, events_log, str(duration), run_id)
         if video_writer: video_writer.release()
         pygame.quit()
