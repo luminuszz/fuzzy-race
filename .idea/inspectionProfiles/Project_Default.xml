@@ -1,0 +1,50 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="false" level="WARNING" enabled_by_default="false">
+      <option name="ignoredPackages">
+        <list>
+          <option value="gunicorn" />
+          <option value="uvicorn" />
+          <option value="pydantic" />
+          <option value="fastapi" />
+          <option value="py-eureka-client" />
+          <option value="python-json-logger" />
+          <option value="blinker" />
+          <option value="pylint" />
+          <option value="aws-xray-sdk" />
+          <option value="waitress" />
+          <option value="brotli" />
+          <option value="first" />
+          <option value="rich" />
+          <option value="structlog" />
+          <option value="python-dotenv" />
+          <option value="dacite" />
+          <option value="pyperclip" />
+          <option value="numpy" />
+          <option value="urllib3" />
+          <option value="wrapt" />
+          <option value="requests" />
+          <option value="boto3" />
+          <option value="marshmallow" />
+          <option value="tox" />
+          <option value="kml2geojson" />
+          <option value="Shapely" />
+          <option value="pyproj" />
+          <option value="python-dateutil" />
+          <option value="PyGeodesy" />
+          <option value="botocore" />
+          <option value="googlemaps" />
+          <option value="async-googlemaps" />
+          <option value="aiohttp" />
+          <option value="pytz" />
+          <option value="pytest-random-order" />
+          <option value="jsonpath-ng" />
+          <option value="httpx" />
+          <option value="pydantic-settings" />
+          <option value="dependency-injector" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
