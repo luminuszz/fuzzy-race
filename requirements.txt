@@ -3,3 +3,4 @@ pygad
 scikit-fuzzy
 numpy
 opencv-python
+scipy

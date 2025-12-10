@@ -33,7 +33,7 @@ CONFIG = {
     'MIN_MUTATION': 1.0,
     'COOLING_RATE': 0.995,
 
-    'RECORD_VIDEO': False,
+    'RECORD_VIDEO': True,
     'VIDEO_FILENAME': 'video.mp4',
     'REPORT_FILE': 'relatorio.txt',
     'CSV_FILE': 'dados.csv'

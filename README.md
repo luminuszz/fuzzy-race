@@ -1,10 +1,14 @@
 -----
 
-# 🏎️ Piloto Automático Híbrido: Lógica Fuzzy + Algoritmos Genéticos
+#  Piloto Automático Híbrido: Lógica Fuzzy + Algoritmos Genéticos
 
 **Para:** Prof. Genaro  
-**Aluno:** [Seu Nome Aqui]  
-**Disciplina:** [Nome da Matéria]
+**Alunos:** 
+  - Davi dos Santos Ribeiro (200029600)
+  - Alisson de Oliveira dos Santos (200016718)  
+  - Ana Julia Silva de Oliveira (200031456)
+**Disciplina:** [IA - Inteligência Artificial]
+
 
 -----
 
