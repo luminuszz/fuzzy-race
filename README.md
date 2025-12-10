@@ -6,7 +6,7 @@
 **Alunos:** 
   - Davi dos Santos Ribeiro (200029600)
   - Alisson de Oliveira dos Santos (200016718)  
-  - Ana Julia Silva de Oliveira (200031456)
+  - Ana Júlia Gusmão do Nascimento (200028628)
 **Disciplina:** [IA - Inteligência Artificial]
 
 
