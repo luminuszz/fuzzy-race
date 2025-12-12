@@ -115,7 +115,6 @@ class RaceCar:
         # === CONTROLE ANTI-SPIN (ANTI-ZERINHO) ===
         self.spin_accumulator = 0  # Acumula graus virados
         self.distance_at_last_spin = 0  # Distância quando começou a contar o giro
-        # =========================================
 
     def _get_angle_to_center(self):
         dx = self.position.x - self.center_map.x
@@ -274,9 +273,7 @@ def calculate_fitness_scores(cars, max_time):
                 score = 0
             else:
                 # O fitness principal é o progresso angular (voltas na pista)
-                # Multiplicamos por 1000 para ser um número relevante
                 score = car.total_radians * 1000
-
                 # Se o carro for pego andando pra trás (total_radians negativo), score é 0
                 if score < 0: score = 0
 
