@@ -54,6 +54,9 @@ O projeto foi desenvolvido em **Python 3**. As bibliotecas necessárias são:
 ### Passo a Passo:
 
 1.  **Clone ou baixe o repositório.**
+    ```bash
+      git clone https://github.com/luminuszz/fuzzy-race.git
+    ```
 2.  **Instale as dependências:**
     ```bash
     pip install pygame pygad scikit-fuzzy numpy opencv-python scipy
